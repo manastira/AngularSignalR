@@ -1,148 +1,144 @@
-﻿using System;
+﻿using AngularSignalR.Data;
+using AngularSignalR.Models;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.SignalR;
+using Microsoft.EntityFrameworkCore;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Mvc.Rendering;
-using Microsoft.EntityFrameworkCore;
-using AngularSignalR.Data;
-using AngularSignalR.Models;
 
 namespace AngularSignalR.Controllers
 {
     public class EmployeesController : Controller
     {
         private readonly AngularSignalRContext _context;
+        private readonly IHubContext<BroadcastHub, IHubClient> _hubContext;
 
-        public EmployeesController(AngularSignalRContext context)
+        public EmployeesController(AngularSignalRContext context, IHubContext<BroadcastHub, IHubClient> hubContext)
         {
             _context = context;
+            _hubContext = hubContext;
         }
 
-        // GET: Employees
-        public async Task<IActionResult> Index()
+        // GET: api/Employees  
+        [HttpGet]
+        public async Task<ActionResult<IEnumerable<Employee>>> GetEmployee()
         {
-            return View(await _context.Employee.ToListAsync());
+            return await _context.Employee.ToListAsync();
         }
 
-        // GET: Employees/Details/5
-        public async Task<IActionResult> Details(string id)
+        // GET: api/Employees/5  
+        [HttpGet("{id}")]
+        public async Task<ActionResult<Employee>> GetEmployee(string id)
         {
-            if (id == null)
-            {
-                return NotFound();
-            }
-
-            var employee = await _context.Employee
-                .FirstOrDefaultAsync(m => m.Id == id);
-            if (employee == null)
-            {
-                return NotFound();
-            }
-
-            return View(employee);
-        }
-
-        // GET: Employees/Create
-        public IActionResult Create()
-        {
-            return View();
-        }
-
-        // POST: Employees/Create
-        // To protect from overposting attacks, enable the specific properties you want to bind to.
-        // For more details, see http://go.microsoft.com/fwlink/?LinkId=317598.
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Create([Bind("Id,Name,Designation,Company,Cityname,Address,Gender")] Employee employee)
-        {
-            if (ModelState.IsValid)
-            {
-                _context.Add(employee);
-                await _context.SaveChangesAsync();
-                return RedirectToAction(nameof(Index));
-            }
-            return View(employee);
-        }
-
-        // GET: Employees/Edit/5
-        public async Task<IActionResult> Edit(string id)
-        {
-            if (id == null)
-            {
-                return NotFound();
-            }
-
             var employee = await _context.Employee.FindAsync(id);
+
             if (employee == null)
             {
                 return NotFound();
             }
-            return View(employee);
+
+            return employee;
         }
 
-        // POST: Employees/Edit/5
-        // To protect from overposting attacks, enable the specific properties you want to bind to.
-        // For more details, see http://go.microsoft.com/fwlink/?LinkId=317598.
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Edit(string id, [Bind("Id,Name,Designation,Company,Cityname,Address,Gender")] Employee employee)
+        // PUT: api/Employees/5  
+        // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754  
+        [HttpPut("{id}")]
+        public async Task<IActionResult> PutEmployee(string id, Employee employee)
         {
             if (id != employee.Id)
             {
-                return NotFound();
+                return BadRequest();
             }
 
-            if (ModelState.IsValid)
+            _context.Entry(employee).State = EntityState.Modified;
+
+            Notification notification = new Notification()
             {
-                try
-                {
-                    _context.Update(employee);
-                    await _context.SaveChangesAsync();
-                }
-                catch (DbUpdateConcurrencyException)
-                {
-                    if (!EmployeeExists(employee.Id))
-                    {
-                        return NotFound();
-                    }
-                    else
-                    {
-                        throw;
-                    }
-                }
-                return RedirectToAction(nameof(Index));
+                EmployeeName = employee.Name,
+                TranType = "Edit"
+            };
+            _context.Notification.Add(notification);
+
+            try
+            {
+                await _context.SaveChangesAsync();
+                await _hubContext.Clients.All.BroadcastMessages();
             }
-            return View(employee);
+            catch (DbUpdateConcurrencyException)
+            {
+                if (!EmployeeExists(id))
+                {
+                    return NotFound();
+                }
+                else
+                {
+                    throw;
+                }
+            }
+
+            return NoContent();
         }
 
-        // GET: Employees/Delete/5
-        public async Task<IActionResult> Delete(string id)
+        // POST: api/Employees  
+        // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754  
+        [HttpPost]
+        public async Task<ActionResult<Employee>> PostEmployee(Employee employee)
         {
-            if (id == null)
+            employee.Id = Guid.NewGuid().ToString();
+            _context.Employee.Add(employee);
+
+            Notification notification = new Notification()
             {
-                return NotFound();
+                EmployeeName = employee.Name,
+                TranType = "Add"
+            };
+            _context.Notification.Add(notification);
+
+            try
+            {
+                await _context.SaveChangesAsync();
+                await _hubContext.Clients.All.BroadcastMessages();
+            }
+            catch (DbUpdateException)
+            {
+                if (EmployeeExists(employee.Id))
+                {
+                    return Conflict();
+                }
+                else
+                {
+                    throw;
+                }
             }
 
-            var employee = await _context.Employee
-                .FirstOrDefaultAsync(m => m.Id == id);
+            return CreatedAtAction("GetEmployee", new { id = employee.Id }, employee);
+        }
+
+        // DELETE: api/Employees/5  
+        [HttpDelete("{id}")]
+        public async Task<IActionResult> DeleteEmployee(string id)
+        {
+            var employee = await _context.Employee.FindAsync(id);
             if (employee == null)
             {
                 return NotFound();
             }
 
-            return View(employee);
-        }
+            Notification notification = new Notification()
+            {
+                EmployeeName = employee.Name,
+                TranType = "Delete"
+            };
 
-        // POST: Employees/Delete/5
-        [HttpPost, ActionName("Delete")]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> DeleteConfirmed(string id)
-        {
-            var employee = await _context.Employee.FindAsync(id);
             _context.Employee.Remove(employee);
+            _context.Notification.Add(notification);
+
             await _context.SaveChangesAsync();
-            return RedirectToAction(nameof(Index));
+            await _hubContext.Clients.All.BroadcastMessages();
+
+            return NoContent();
         }
 
         private bool EmployeeExists(string id)

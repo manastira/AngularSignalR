@@ -4,6 +4,6 @@ namespace AngularSignalR.Models
 {
     public interface IHubClient
     {
-        Task BroadcastMessage();
+        Task BroadcastMessages();
     }
 }
