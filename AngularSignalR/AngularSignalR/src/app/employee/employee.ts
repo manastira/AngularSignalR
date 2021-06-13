@@ -1,6 +1,6 @@
 export interface Employee {
   id: string | null,
-  name: String,
+  name: string,
   address: string | null | undefined,
   gender: string | null | undefined,
   company: string | null | undefined,

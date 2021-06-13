@@ -10,7 +10,7 @@ import { environment } from 'src/environments/environment';
 })
 export class EmployeeService {
   private employeesUrl = environment.baseUrl + 'api/employees';
-  const headers = new HttpHeaders({ 'Content-Type': 'application/json' });
+  private  headers = new HttpHeaders({ 'Content-Type': 'application/json' });
 
   constructor(private http: HttpClient) { }
 
