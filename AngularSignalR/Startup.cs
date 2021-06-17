@@ -77,7 +77,11 @@ namespace AngularSignalR
             app.UseAuthentication();
             app.UseAuthorization();
             app.UseCors("CorsPolicy");
-
+            app.UseStaticFiles();
+            if (!env.IsDevelopment())
+            {
+                app.UseSpaStaticFiles();
+            }
             app.UseEndpoints(endpoints =>
             {
                 endpoints.MapHub<BroadcastHub>("/notify");
